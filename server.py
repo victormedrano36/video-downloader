@@ -17,7 +17,7 @@ CORS(app)
 
 # Encontrar Node.js dinámicamente para yt-dlp (necesario para YouTube)
 def find_node():
-    paths = ['/usr/local/bin/node', '/usr/bin/node', '/usr/sbin/node', 'node']
+    paths = ['/usr/local/bin/node', '/usr/bin/node', '/usr/sbin/node', '/node/18/bin/node', 'node']
     import shutil
     for p in paths:
         if shutil.which(p):
@@ -28,7 +28,7 @@ NODE_PATH = find_node()
 if NODE_PATH:
     print(f'Node.js encontrado en: {NODE_PATH}')
 else:
-    print('Advertencia: Node.js no encontrado. YouTube podría no funcionar.')
+    print('Advertencia: Node.js no encontrado. YouTube podría no funcionar con todos los extractores.')
 
 # Carpeta temporal para archivos de video
 DOWNLOAD_DIR = os.path.join(tempfile.gettempdir(), 'video-downloader')
