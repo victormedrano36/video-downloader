@@ -14,22 +14,22 @@ else
     NODE_ARCH="x64"
 fi
 
-# Instalar Node.js 20 LTS
+# Instalar Node.js en el directorio del proyecto (Render permite escribir aquí)
 NODE_VERSION="v20.11.0"
-NODE_DIR="/opt/node"
+NODE_DIR="$HOME/node"
 
 if [ ! -d "$NODE_DIR" ]; then
     echo "Descargando Node.js $NODE_VERSION..."
     mkdir -p $NODE_DIR
     curl -sL "https://nodejs.org/dist/$NODE_VERSION/node-$NODE_VERSION-linux-$NODE_ARCH.tar.xz" | tar -xJ -C $NODE_DIR --strip-components=1
-    ln -sf $NODE_DIR/bin/node /usr/local/bin/node
-    ln -sf $NODE_DIR/bin/npx /usr/local/bin/npx
     echo "Node.js instalado en $NODE_DIR"
 else
-    ln -sf $NODE_DIR/bin/node /usr/local/bin/node
-    ln -sf $NODE_DIR/bin/npx /usr/local/bin/npx
     echo "Node.js ya instalado en $NODE_DIR"
 fi
+
+# Agregar Node.js al PATH
+export PATH="$NODE_DIR/bin:$PATH"
+echo "export PATH=$NODE_DIR/bin:$PATH" >> "$HOME/.bashrc"
 
 node --version
 echo "=== Instalación completada ==="

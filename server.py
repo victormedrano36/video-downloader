@@ -17,8 +17,15 @@ CORS(app)
 
 # Encontrar Node.js dinámicamente para yt-dlp (necesario para YouTube)
 def find_node():
-    paths = ['/usr/local/bin/node', '/usr/bin/node', '/usr/sbin/node', '/node/18/bin/node', 'node']
     import shutil
+    home = os.environ.get('HOME', '')
+    paths = [
+        os.path.join(home, 'node/bin/node'),
+        '/usr/local/bin/node',
+        '/usr/bin/node',
+        '/usr/sbin/node',
+        'node',
+    ]
     for p in paths:
         if shutil.which(p):
             return p
