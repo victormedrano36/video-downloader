@@ -1,15 +1,83 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import './App.css'
 
-// Cambia esta URL por la de tu backend en Render después de desplegar
-// Ejemplo: 'https://tu-backend.onrender.com'
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+// URL de tu instancia de Cobalt API (desplegada en Railway u otro servidor)
+// Ejemplo: 'https://tu-cobalt.railway.app/'
+const API_BASE = import.meta.env.VITE_API_URL || ''
+
+// Calidades disponibles para Cobalt
+const QUALITY_OPTIONS = [
+  { label: 'Max', value: 'max', description: 'Mejor disponible' },
+  { label: '4K', value: '2160', description: '2160p Ultra HD' },
+  { label: '1080p', value: '1080', description: 'Full HD' },
+  { label: '720p', value: '720', description: 'HD' },
+  { label: '480p', value: '480', description: 'SD' },
+  { label: '360p', value: '360', description: 'Baja' },
+]
 
 function formatDuration(seconds) {
   if (!seconds) return '0:00'
   const mins = Math.floor(seconds / 60)
   const secs = Math.floor(seconds % 60)
   return `${mins}:${secs.toString().padStart(2, '0')}`
+}
+
+// Detectar plataforma desde la URL
+function detectPlatform(videoUrl) {
+  const lower = videoUrl.toLowerCase()
+  if (lower.includes('youtube.com') || lower.includes('youtu.be')) return 'youtube'
+  if (lower.includes('tiktok.com')) return 'tiktok'
+  if (lower.includes('instagram.com')) return 'instagram'
+  if (lower.includes('facebook.com') || lower.includes('fb.com')) return 'facebook'
+  if (lower.includes('x.com') || lower.includes('twitter.com')) return 'twitter'
+  if (lower.includes('vimeo.com')) return 'vimeo'
+  if (lower.includes('reddit.com')) return 'reddit'
+  if (lower.includes('twitch.tv')) return 'twitch'
+  return 'unknown'
+}
+
+// Obtener info del video usando oEmbed (sin backend)
+async function fetchVideoInfo(videoUrl) {
+  const platform = detectPlatform(videoUrl)
+  let oembedUrl = ''
+
+  switch (platform) {
+    case 'youtube':
+      oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(videoUrl)}&format=json`
+      break
+    case 'tiktok':
+      oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(videoUrl)}`
+      break
+    case 'instagram':
+      oembedUrl = `https://api.instagram.com/oembed?url=${encodeURIComponent(videoUrl)}`
+      break
+    case 'facebook':
+      oembedUrl = `https://graph.facebook.com/v18.0/oembed_post?url=${encodeURIComponent(videoUrl)}`
+      break
+    case 'twitter':
+      oembedUrl = `https://publish.twitter.com/oembed?url=${encodeURIComponent(videoUrl)}`
+      break
+    case 'vimeo':
+      oembedUrl = `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(videoUrl)}`
+      break
+    default:
+      return null
+  }
+
+  try {
+    const response = await fetch(oembedUrl)
+    if (!response.ok) return null
+    const data = await response.json()
+    return {
+      title: data.title || data.author_name || 'Video',
+      thumbnail: data.thumbnail_url || '',
+      duration: data.duration ? parseInt(data.duration) : 0,
+      uploader: data.author_name || '',
+      author_url: data.author_url || '',
+    }
+  } catch {
+    return null
+  }
 }
 
 function App() {
@@ -19,24 +87,17 @@ function App() {
   const [progress, setProgress] = useState('')
   const [step, setStep] = useState('input') // 'input' | 'formats' | 'downloading' | 'ready'
   const [videoInfo, setVideoInfo] = useState(null)
-  const [formats, setFormats] = useState([])
-  const [selectedFormat, setSelectedFormat] = useState(null)
-  const [downloadReady, setDownloadReady] = useState(false)
-  const [downloadPath, setDownloadPath] = useState('')
+  const [selectedQuality, setSelectedQuality] = useState('1080')
+  const [downloadUrl, setDownloadUrl] = useState('')
   const [downloadPercent, setDownloadPercent] = useState(0)
-  const [downloadSpeed, setDownloadSpeed] = useState('')
-  const [downloadEta, setDownloadEta] = useState('')
-  const [downloadedSize, setDownloadedSize] = useState('')
-  const [totalSize, setTotalSize] = useState('')
+  const abortControllerRef = useRef(null)
 
   const handleFetchInfo = async (e) => {
     e.preventDefault()
     setError('')
     setVideoInfo(null)
-    setFormats([])
-    setDownloadReady(false)
-    setDownloadPath('')
-    setSelectedFormat(null)
+    setDownloadUrl('')
+    setSelectedQuality('1080')
     setStep('input')
 
     if (!url.trim()) {
@@ -51,55 +112,44 @@ function App() {
       return
     }
 
+    // Verificar que Cobalt API esté configurada
+    if (!API_BASE.trim()) {
+      setError('Servicio de descarga no configurado. Contacta al administrador.')
+      return
+    }
+
     setLoading(true)
     setProgress('Buscando video...')
 
     try {
-      // Obtener info del video
-      const infoResponse = await fetch(`${API_BASE}/api/info`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url.trim() })
+      // Intentar obtener info con oEmbed
+      const info = await fetchVideoInfo(url.trim())
+      if (info) {
+        setVideoInfo(info)
+      }
+
+      setProgress('Verificando enlace...')
+
+      // Verificar que Cobalt esté accesible
+      const checkResponse = await fetch(API_BASE, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
       })
 
-      const infoData = await infoResponse.json()
-
-      if (!infoResponse.ok) {
-        setError(infoData.error || 'No se pudo obtener información del video')
+      if (!checkResponse.ok) {
+        setError('El servicio de descarga no está disponible. Intenta de nuevo en unos segundos.')
         setLoading(false)
         setProgress('')
         return
-      }
-
-      setVideoInfo(infoData)
-      setProgress('Obteniendo calidades disponibles...')
-
-      // Obtener formatos disponibles
-      const formatsResponse = await fetch(`${API_BASE}/api/formats`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url.trim() })
-      })
-
-      const formatsData = await formatsResponse.json()
-
-      if (!formatsResponse.ok) {
-        setError(formatsData.error || 'No se pudieron obtener las calidades')
-        setLoading(false)
-        setProgress('')
-        return
-      }
-
-      setFormats(formatsData.formats)
-
-      // Seleccionar el mejor formato por defecto
-      if (formatsData.formats.length > 0) {
-        setSelectedFormat(formatsData.formats[0])
       }
 
       setStep('formats')
     } catch (err) {
-      setError('Error de conexión. Verifica que el servidor esté corriendo.')
+      if (err.name === 'AbortError') {
+        setError('Se canceló la búsqueda.')
+      } else {
+        setError('No se pudo conectar con el servicio de descarga. Verifica tu conexión.')
+      }
     } finally {
       setLoading(false)
       setProgress('')
@@ -107,99 +157,115 @@ function App() {
   }
 
   const handleDownload = async () => {
-    if (!selectedFormat) {
-      setError('Selecciona una calidad')
-      return
-    }
-
     setError('')
     setStep('downloading')
     setLoading(true)
-    setProgress('Iniciando descarga...')
+    setProgress('Procesando video...')
     setDownloadPercent(0)
-    setDownloadSpeed('')
-    setDownloadEta('')
-    setDownloadedSize('')
-    setTotalSize('')
+    setDownloadUrl('')
+
+    // Simular progreso mientras Cobalt procesa
+    let progressInterval
+    let currentPercent = 0
+    progressInterval = setInterval(() => {
+      currentPercent += Math.random() * 15
+      if (currentPercent > 90) currentPercent = 90
+      setDownloadPercent(currentPercent)
+    }, 500)
+
+    abortControllerRef.current = abortControllerRef.current || new AbortController()
 
     try {
-      const downloadResponse = await fetch(`${API_BASE}/api/download`, {
+      const response = await fetch(API_BASE, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
         body: JSON.stringify({
           url: url.trim(),
-          format_id: selectedFormat.format_id,
-        })
+          videoQuality: selectedQuality,
+          downloadMode: 'auto',
+          filenameStyle: 'pretty',
+        }),
+        signal: abortControllerRef.current.signal,
       })
 
-      const downloadData = await downloadResponse.json()
-
-      if (!downloadResponse.ok) {
-        setError(downloadData.error || 'No se pudo descargar el video')
-        setLoading(false)
-        setProgress('')
-        setStep('formats')
-        return
-      }
-
-      setDownloadPath(downloadData.download_path)
-      setDownloadReady(true)
-      setStep('ready')
-      setProgress('')
+      clearInterval(progressInterval)
       setDownloadPercent(100)
+
+      const data = await response.json()
+
+      if (data.status === 'redirect' && data.url) {
+        // Cobalt devuelve un enlace directo
+        setDownloadUrl(data.url)
+        setStep('ready')
+        setProgress('')
+      } else if (data.status === 'stream' && data.url) {
+        // Cobalt devuelve un enlace de streaming (tunnel)
+        setDownloadUrl(data.url)
+        setStep('ready')
+        setProgress('')
+      } else if (data.status === 'picker' && data.picker) {
+        // Múltiples archivos (ej: Instagram carousel)
+        setError('Este contenido tiene múltiples archivos. Intenta con un video individual.')
+        setStep('formats')
+        setProgress('')
+        setDownloadPercent(0)
+      } else if (data.status === 'error') {
+        const errorMsg = data.text || data.error || 'No se pudo procesar el video'
+        setError(errorMsg)
+        setStep('formats')
+        setProgress('')
+        setDownloadPercent(0)
+      } else {
+        setError('Respuesta inesperada del servidor. Intenta de nuevo.')
+        setStep('formats')
+        setProgress('')
+        setDownloadPercent(0)
+      }
     } catch (err) {
-      setError('Error de conexión. Verifica que el servidor esté corriendo.')
+      clearInterval(progressInterval)
+      if (err.name === 'AbortError') {
+        setError('Se canceló la descarga.')
+      } else {
+        setError('Error de conexión con el servicio de descarga.')
+      }
       setStep('formats')
+      setProgress('')
+      setDownloadPercent(0)
     } finally {
       setLoading(false)
-      setProgress('')
     }
   }
 
-  // Polling para progreso de descarga
-  useEffect(() => {
-    let interval = null
-    if (step === 'downloading') {
-      interval = setInterval(async () => {
-        try {
-          const res = await fetch(`${API_BASE}/api/progress`)
-          const data = await res.json()
-          setDownloadPercent(data.percent || 0)
-          setDownloadSpeed(data.speed || '')
-          setDownloadEta(data.eta || '')
-          setDownloadedSize(data.downloaded || '')
-          setTotalSize(data.total || '')
-
-          if (data.status === 'finished') {
-            setDownloadPercent(100)
-          }
-        } catch {
-          // Ignorar errores de polling
-        }
-      }, 500)
-    }
-    return () => {
-      if (interval) clearInterval(interval)
-    }
-  }, [step])
-
   const handleDownloadFile = () => {
-    if (downloadPath) {
-      window.open(`${API_BASE}${downloadPath}`, '_blank')
+    if (downloadUrl) {
+      // Crear un enlace de descarga directa
+      const a = document.createElement('a')
+      a.href = downloadUrl
+      a.download = ''
+      a.target = '_blank'
+      a.rel = 'noopener noreferrer'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
     }
   }
 
   const handleReset = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+    }
     setUrl('')
     setError('')
     setVideoInfo(null)
-    setFormats([])
-    setSelectedFormat(null)
-    setDownloadReady(false)
-    setDownloadPath('')
+    setDownloadUrl('')
     setStep('input')
     setLoading(false)
     setProgress('')
+    setDownloadPercent(0)
   }
 
   return (
@@ -333,29 +399,28 @@ function App() {
         )}
 
         {/* Quality Selection */}
-        {step === 'formats' && formats.length > 0 && (
+        {step === 'formats' && (
           <div className="quality-section">
             <h3 className="section-title">
               <span className="title-icon">🎬</span>
               Selecciona la calidad
             </h3>
             <div className="quality-grid">
-              {formats.map((format) => (
+              {QUALITY_OPTIONS.map((quality) => (
                 <button
-                  key={format.format_id}
-                  className={`quality-card ${selectedFormat?.format_id === format.format_id ? 'selected' : ''}`}
-                  onClick={() => setSelectedFormat(format)}
+                  key={quality.value}
+                  className={`quality-card ${selectedQuality === quality.value ? 'selected' : ''}`}
+                  onClick={() => setSelectedQuality(quality.value)}
                 >
-                  <div className="quality-label">{format.label}</div>
-                  <div className="quality-fps">{format.fps}fps</div>
-                  {format.size && <div className="quality-size">{format.size}</div>}
+                  <div className="quality-label">{quality.label}</div>
+                  <div className="quality-fps">{quality.description}</div>
                   <div className="quality-check">✓</div>
                 </button>
               ))}
             </div>
             <button onClick={handleDownload} className="download-now-btn">
               <span className="btn-icon">⬇</span>
-              Descargar {selectedFormat?.label || ''}
+              Descargar {QUALITY_OPTIONS.find(q => q.value === selectedQuality)?.label || ''}
             </button>
           </div>
         )}
@@ -364,7 +429,7 @@ function App() {
         {step === 'downloading' && (
           <div className="download-progress-section">
             <div className="progress-header">
-              <span className="progress-label">Descargando video...</span>
+              <span className="progress-label">Procesando video...</span>
               <span className="progress-percent">{Math.round(downloadPercent)}%</span>
             </div>
             <div className="progress-bar-track">
@@ -374,37 +439,23 @@ function App() {
               ></div>
             </div>
             <div className="progress-details">
-              {downloadSpeed && (
-                <span className="progress-detail-item">
-                  <span className="progress-detail-icon">⚡</span>
-                  {downloadSpeed}
-                </span>
-              )}
-              {downloadedSize && totalSize && (
-                <span className="progress-detail-item">
-                  <span className="progress-detail-icon">📦</span>
-                  {downloadedSize} / {totalSize}
-                </span>
-              )}
-              {downloadEta && (
-                <span className="progress-detail-item">
-                  <span className="progress-detail-icon">⏳</span>
-                  {downloadEta}
-                </span>
-              )}
+              <span className="progress-detail-item">
+                <span className="progress-detail-icon">⏳</span>
+                {progress || 'Preparando descarga...'}
+              </span>
             </div>
           </div>
         )}
 
         {/* Download Ready */}
-        {step === 'ready' && downloadReady && (
+        {step === 'ready' && downloadUrl && (
           <div className="success-section">
             <div className="success-icon">✅</div>
             <h3 className="success-title">¡Video listo!</h3>
-            <p className="success-text">Tu video se ha descargado correctamente</p>
+            <p className="success-text">Tu video se ha procesado correctamente</p>
             <button onClick={handleDownloadFile} className="save-btn">
               <span className="btn-icon">💾</span>
-              Guardar en mi dispositivo
+              Descargar video
             </button>
             <button onClick={handleReset} className="reset-btn">
               Descargar otro video
