@@ -192,17 +192,35 @@ function App() {
       })
 
       clearInterval(progressInterval)
-      setDownloadPercent(100)
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => '')
+        console.error('Cobalt HTTP error:', response.status, errorText)
+        setError(`El servicio devolvió un error (${response.status}). Intenta con otro video.`)
+        setStep('formats')
+        setProgress('')
+        setDownloadPercent(0)
+        setLoading(false)
+        return
+      }
 
       const data = await response.json()
+      console.log('Cobalt response:', data)
+
+      setDownloadPercent(100)
 
       if (data.status === 'redirect' && data.url) {
         // Cobalt devuelve un enlace directo
         setDownloadUrl(data.url)
         setStep('ready')
         setProgress('')
+      } else if (data.status === 'tunnel' && data.url) {
+        // Cobalt devuelve un enlace de tunnel/streaming
+        setDownloadUrl(data.url)
+        setStep('ready')
+        setProgress('')
       } else if (data.status === 'stream' && data.url) {
-        // Cobalt devuelve un enlace de streaming (tunnel)
+        // Cobalt devuelve un enlace de streaming
         setDownloadUrl(data.url)
         setStep('ready')
         setProgress('')
@@ -219,6 +237,7 @@ function App() {
         setProgress('')
         setDownloadPercent(0)
       } else {
+        console.error('Unexpected Cobalt response:', data)
         setError('Respuesta inesperada del servidor. Intenta de nuevo.')
         setStep('formats')
         setProgress('')
@@ -226,10 +245,11 @@ function App() {
       }
     } catch (err) {
       clearInterval(progressInterval)
+      console.error('Download error:', err)
       if (err.name === 'AbortError') {
         setError('Se canceló la descarga.')
       } else {
-        setError('Error de conexión con el servicio de descarga.')
+        setError('Error de conexión con el servicio de descarga. Verifica que el servicio esté activo.')
       }
       setStep('formats')
       setProgress('')
