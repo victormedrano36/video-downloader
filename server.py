@@ -12,7 +12,23 @@ if hasattr(signal, 'SIGPIPE'):
     signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
 app = Flask(__name__)
+# CORS: permitir todos los dominios para que el frontend en Vercel pueda conectar
 CORS(app)
+
+# Encontrar Node.js dinámicamente para yt-dlp (necesario para YouTube)
+def find_node():
+    paths = ['/usr/local/bin/node', '/usr/bin/node', '/usr/sbin/node', 'node']
+    import shutil
+    for p in paths:
+        if shutil.which(p):
+            return p
+    return None
+
+NODE_PATH = find_node()
+if NODE_PATH:
+    print(f'Node.js encontrado en: {NODE_PATH}')
+else:
+    print('Advertencia: Node.js no encontrado. YouTube podría no funcionar.')
 
 # Carpeta temporal para archivos de video
 DOWNLOAD_DIR = os.path.join(tempfile.gettempdir(), 'video-downloader')
@@ -34,15 +50,21 @@ def cleanup_file(filepath):
     thread = threading.Thread(target=delete, daemon=True)
     thread.start()
 
-def get_available_formats(url):
-    """Obtener las calidades disponibles para un video."""
-    ydl_opts = {
+def get_ydl_base_opts():
+    """Opciones base para yt-dlp con Node.js dinámico."""
+    opts = {
         'quiet': True,
         'no_warnings': True,
         'extract_flat': False,
-        'js_runtimes': {'node': {'path': '/usr/local/bin/node'}},
-        'remote_components': {'ejs:github': None},
     }
+    if NODE_PATH:
+        opts['js_runtimes'] = {'node': {'path': NODE_PATH}}
+        opts['remote_components'] = {'ejs:github': None}
+    return opts
+
+def get_available_formats(url):
+    """Obtener las calidades disponibles para un video."""
+    ydl_opts = get_ydl_base_opts()
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -171,11 +193,11 @@ def extract_video(url, format_id=None):
         'writesubtitles': False,
         'writesubtitlesfiles': False,
         'progress_hooks': [progress_hook],
-        # Runtime de JavaScript necesario para YouTube
-        'js_runtimes': {'node': {'path': '/usr/local/bin/node'}},
-        # Componente remoto para resolver desafíos de YouTube
-        'remote_components': {'ejs:github': None},
     }
+    # Agregar Node.js si está disponible
+    if NODE_PATH:
+        ydl_opts['js_runtimes'] = {'node': {'path': NODE_PATH}}
+        ydl_opts['remote_components'] = {'ejs:github': None}
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -206,13 +228,7 @@ def get_info():
     if not url:
         return jsonify({'error': 'Por favor, proporciona un enlace de video'}), 400
 
-    ydl_opts = {
-        'quiet': True,
-        'no_warnings': True,
-        'extract_flat': False,
-        'js_runtimes': {'node': {'path': '/usr/local/bin/node'}},
-        'remote_components': {'ejs:github': None},
-    }
+    ydl_opts = get_ydl_base_opts()
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -293,6 +309,7 @@ def stream_video(filename):
     )
 
 if __name__ == '__main__':
-    print(f'Servidor backend corriendo en http://localhost:3001')
+    port = int(os.environ.get('PORT', 3001))
+    print(f'Servidor backend corriendo en puerto {port}')
     print(f'Archivos temporales en: {DOWNLOAD_DIR}')
-    app.run(host='0.0.0.0', port=3001, debug=False)
+    app.run(host='0.0.0.0', port=port, debug=False)

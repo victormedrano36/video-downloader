@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import './App.css'
 
-const API_BASE = 'http://localhost:3001'
+// Cambia esta URL por la de tu backend en Render después de desplegar
+// Ejemplo: 'https://tu-backend.onrender.com'
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 function formatDuration(seconds) {
   if (!seconds) return '0:00'
@@ -409,6 +411,19 @@ function App() {
             </button>
           </div>
         )}
+
+        {/* Donate Section */}
+        <div className="donate-section">
+          <p className="donate-text">¿Te gusta esta herramienta? Apóyame con un café ☕</p>
+          <div className="donate-buttons">
+            <a href="https://ko-fi.com" target="_blank" rel="noopener noreferrer" className="donate-btn kofi">
+              ☕ Buy Me a Coffee
+            </a>
+            <a href="https://www.paypal.com" target="_blank" rel="noopener noreferrer" className="donate-btn paypal">
+              💳 PayPal Donate
+            </a>
+          </div>
+        </div>
 
         {/* Footer */}
         <div className="footer">
