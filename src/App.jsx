@@ -556,6 +556,61 @@ function App() {
           </div>
         </div>
 
+        {/* FAQ Section - SEO Optimized */}
+        <section className="faq-section" aria-label="Preguntas frecuentes">
+          <h2 className="faq-title">Preguntas frecuentes</h2>
+          <div className="faq-list">
+            <div className="faq-item">
+              <h3 className="faq-question">¿Cómo descargar videos de YouTube en MP4 gratis?</h3>
+              <div className="faq-answer">
+                <p>Pega el enlace del video de YouTube en nuestra herramienta, selecciona la calidad deseada (1080p, 720p, 480p) y haz clic en descargar. El video se descargará en formato MP4 directamente a tu dispositivo sin necesidad de instalar software.</p>
+              </div>
+            </div>
+            <div className="faq-item">
+              <h3 className="faq-question">¿Es seguro descargar videos de YouTube con esta herramienta?</h3>
+              <div className="faq-answer">
+                <p>Sí, nuestra herramienta es completamente segura. No almacena videos ni recopila datos personales. El proceso de descarga se realiza de forma directa y encriptada entre tu navegador y el servidor.</p>
+              </div>
+            </div>
+            <div className="faq-item">
+              <h3 className="faq-question">¿Qué calidad de video puedo descargar de YouTube?</h3>
+              <div className="faq-answer">
+                <p>Puedes descargar videos de YouTube en múltiples calidades: 1080p (Full HD), 720p (HD), 480p, 360p, 240p y 144p. La calidad máxima disponible depende del video original en YouTube.</p>
+              </div>
+            </div>
+            <div className="faq-item">
+              <h3 className="faq-question">¿Puedo descargar videos de YouTube desde mi celular?</h3>
+              <div className="faq-answer">
+                <p>Sí, nuestra herramienta funciona perfectamente en cualquier dispositivo: celulares Android e iPhone, tablets y computadoras. Solo necesitas un navegador web y un enlace de YouTube para descargar videos en MP4.</p>
+              </div>
+            </div>
+            <div className="faq-item">
+              <h3 className="faq-question">¿Necesito instalar algo para descargar videos de YouTube?</h3>
+              <div className="faq-answer">
+                <p>No, no necesitas instalar ningún software. Nuestra herramienta funciona completamente online en tu navegador web. Solo pega el enlace del video de YouTube y descarga en formato MP4 directamente.</p>
+              </div>
+            </div>
+            <div className="faq-item">
+              <h3 className="faq-question">¿Cuánto cuesta descargar videos de YouTube?</h3>
+              <div className="faq-answer">
+                <p>Es completamente gratis. No hay límite de descargas ni suscripciones ocultas. Puedes descargar todos los videos de YouTube que necesites en formato MP4 sin costo alguno.</p>
+              </div>
+            </div>
+            <div className="faq-item">
+              <h3 className="faq-question">¿Cómo convertir YouTube a MP4 online?</h3>
+              <div className="faq-answer">
+                <p>Nuestra herramienta convierte videos de YouTube a MP4 automáticamente. Solo copia el enlace del video, pégalo en el campo de búsqueda, elige la calidad que prefieres y el video se convertirá y descargará en formato MP4.</p>
+              </div>
+            </div>
+            <div className="faq-item">
+              <h3 className="faq-question">¿Puedo descargar videos de YouTube en HD 1080p?</h3>
+              <div className="faq-answer">
+                <p>Sí, puedes descargar videos de YouTube en calidad HD 1080p (Full HD) y 720p. También soportamos otras calidades como 480p, 360p y 240p dependiendo de tu conexión a internet y el espacio disponible en tu dispositivo.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Footer */}
         <div className="footer">
           <p>Hecho para descargar tus videos favoritos.</p>

@@ -1,0 +1,14 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://video-downloader-nine-omega.vercel.app/sitemap.xml
+
+# Permitir a Google indexar todo el sitio
+User-agent: Googlebot
+Allow: /
+
+# Permitir a Bing indexar todo el sitio
+User-agent: Bingbot
+Allow: /
