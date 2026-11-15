@@ -608,6 +608,54 @@ function App() {
                 <p>Sí, puedes descargar videos de YouTube en calidad HD 1080p (Full HD) y 720p. También soportamos otras calidades como 480p, 360p y 240p dependiendo de tu conexión a internet y el espacio disponible en tu dispositivo.</p>
               </div>
             </div>
+            <div className="faq-item">
+              <h3 className="faq-question">¿Cómo descargar videos de TikTok sin marca de agua?</h3>
+              <div className="faq-answer">
+                <p>Pega el enlace del video de TikTok en nuestra herramienta y descarga el video en formato MP4 sin marca de agua. El proceso es rápido, gratis y no requiere instalar ninguna aplicación. Funciona desde cualquier dispositivo.</p>
+              </div>
+            </div>
+            <div className="faq-item">
+              <h3 className="faq-question">¿Cómo descargar Reels de Instagram?</h3>
+              <div className="faq-answer">
+                <p>Copia el enlace del Reel de Instagram, pégalo en nuestra herramienta y descarga el video en formato MP4. También puedes descargar fotos, stories y videos normales de Instagram de forma gratuita.</p>
+              </div>
+            </div>
+            <div className="faq-item">
+              <h3 className="faq-question">¿Cómo descargar videos de Facebook?</h3>
+              <div className="faq-answer">
+                <p>Copia el enlace del video de Facebook, pégalo en nuestra herramienta y descarga el video en formato MP4. Soportamos videos públicos de Facebook, Reels y más. La descarga es rápida y sin registro.</p>
+              </div>
+            </div>
+            <div className="faq-item">
+              <h3 className="faq-question">¿Cómo descargar videos de X (Twitter)?</h3>
+              <div className="faq-answer">
+                <p>Copia el enlace del tweet con video de X (Twitter), pégalo en nuestra herramienta y descarga el video en formato MP4. Funciona con videos y GIFs de X (anteriormente Twitter).</p>
+              </div>
+            </div>
+            <div className="faq-item">
+              <h3 className="faq-question">¿Qué redes sociales soporta esta herramienta?</h3>
+              <div className="faq-answer">
+                <p>Nuestra herramienta soporta YouTube, TikTok, Instagram, Facebook, X (Twitter), Vimeo, Reddit, Twitch y muchas más plataformas. Puedes descargar videos de cualquier red social popular en formato MP4.</p>
+              </div>
+            </div>
+            <div className="faq-item">
+              <h3 className="faq-question">¿Puedo descargar videos de TikTok, Instagram y Facebook al mismo tiempo?</h3>
+              <div className="faq-answer">
+                <p>Sí, nuestra herramienta soporta múltiples plataformas. Puedes descargar videos de YouTube, TikTok, Instagram, Facebook y X usando la misma herramienta sin necesidad de cambiar de sitio. Todo es gratis y sin límite.</p>
+              </div>
+            </div>
+            <div className="faq-item">
+              <h3 className="faq-question">¿Es legal descargar videos de redes sociales?</h3>
+              <div className="faq-answer">
+                <p>Descargar videos para uso personal generalmente es aceptable. Sin embargo, respetar los derechos de autor es importante. No uses los videos descargados con fines comerciales sin permiso del creador original.</p>
+              </div>
+            </div>
+            <div className="faq-item">
+              <h3 className="faq-question">¿Dónde se guardan los videos descargados?</h3>
+              <div className="faq-answer">
+                <p>Los videos se guardan en la carpeta de descargas de tu dispositivo. En celulares Android, usualmente en la carpeta "Downloads". En iPhone, se guardan en la app de Archivos. En computadoras, en tu carpeta de descargas predeterminada.</p>
+              </div>
+            </div>
           </div>
         </section>
 
