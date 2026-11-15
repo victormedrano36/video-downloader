@@ -547,11 +547,11 @@ function App() {
         <div className="donate-section">
           <p className="donate-text">¿Te gusta esta herramienta? Apóyame con un café ☕</p>
           <div className="donate-buttons">
-            <a href="https://ko-fi.com" target="_blank" rel="noopener noreferrer" className="donate-btn kofi">
-              ☕ Buy Me a Coffee
+            <a href="https://ko-fi.com/O6M32AOFS5" target="_blank" rel="noopener noreferrer" className="donate-btn kofi">
+              ☕ Ko-fi
             </a>
-            <a href="https://www.paypal.com" target="_blank" rel="noopener noreferrer" className="donate-btn paypal">
-              💳 PayPal Donate
+            <a href="https://www.paypal.com/donate/?hosted_button_id=KA39J4BBLQHP4" target="_blank" rel="noopener noreferrer" className="donate-btn paypal">
+              💳 PayPal
             </a>
           </div>
         </div>
