@@ -335,9 +335,12 @@ function App() {
 
   const handleDownloadFile = () => {
     if (!downloadUrl) return
-    // Descargar directamente redirigiendo al URL de Cobalt
-    // Cobalt ya envía Content-Disposition: attachment, así que el navegador descargará el archivo
-    window.location.href = downloadUrl
+    // Abrir en nueva pestaña para que el navegador descargue con Content-Disposition de Cobalt
+    const newWindow = window.open(downloadUrl, '_blank')
+    if (!newWindow) {
+      // Si el popup blocker lo bloquea, usar redirección
+      window.location.href = downloadUrl
+    }
   }
 
   const handleReset = () => {
