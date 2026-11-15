@@ -273,26 +273,20 @@ function App() {
       setDownloadPercent(100)
 
       if (data.status === 'redirect' && data.url) {
-        // Cobalt devuelve un enlace directo
-        setDownloadUrl(data.url)
-        setDownloadFilename(data.filename || 'video.mp4')
-        setStep('ready')
-        setProgress('')
-        setLoading(false)
+        // Cobalt devuelve un enlace directo - descargar inmediatamente
+        setProgress('Iniciando descarga...')
+        downloadFromUrl(data.url, data.filename || 'video.mp4')
+        setStep('formats')
       } else if (data.status === 'tunnel' && data.url) {
-        // Cobalt devuelve un enlace de tunnel - descargar con fetch + blob
-        setDownloadUrl(data.url)
-        setDownloadFilename(data.filename || 'video.mp4')
-        setStep('ready')
-        setProgress('')
-        setLoading(false)
+        // Cobalt devuelve un enlace de tunnel - descargar inmediatamente
+        setProgress('Iniciando descarga...')
+        downloadFromUrl(data.url, data.filename || 'video.mp4')
+        setStep('formats')
       } else if (data.status === 'stream' && data.url) {
-        // Cobalt devuelve un enlace de streaming
-        setDownloadUrl(data.url)
-        setDownloadFilename(data.filename || 'video.mp4')
-        setStep('ready')
-        setProgress('')
-        setLoading(false)
+        // Cobalt devuelve un enlace de streaming - descargar inmediatamente
+        setProgress('Iniciando descarga...')
+        downloadFromUrl(data.url, data.filename || 'video.mp4')
+        setStep('formats')
       } else if (data.status === 'picker' && data.picker) {
         // Múltiples archivos (ej: Instagram carousel)
         setError('Este contenido tiene múltiples archivos. Intenta con un video individual.')
@@ -328,57 +322,40 @@ function App() {
     }
   }
 
-  const handleDownloadFile = async () => {
-    if (!downloadUrl) return
-
-    setLoading(true)
-    setProgress('Descargando archivo...')
-    setDownloadPercent(0)
-
+  // Función para descargar desde una URL usando blob
+  const downloadFromUrl = async (url, filename) => {
     try {
-      // Descargar el video como blob desde el tunnel de Cobalt
-      const response = await fetch(downloadUrl, {
-        method: 'GET',
-        mode: 'cors',
-      })
-
-      if (!response.ok) {
-        throw new Error(`Error ${response.status}: No se pudo descargar`)
-      }
-
-      // Leer el contenido como blob
+      const response = await fetch(url, { mode: 'cors' })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const blob = await response.blob()
-
-      if (blob.size === 0) {
-        throw new Error('El archivo descargado está vacío')
-      }
-
-      // Crear URL del blob y descargar
+      if (blob.size === 0) throw new Error('Archivo vacío')
       const blobUrl = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = blobUrl
-      a.download = downloadFilename || 'video.mp4'
+      a.download = filename
       a.style.display = 'none'
       document.body.appendChild(a)
       a.click()
-
-      // Limpiar
       setTimeout(() => {
         document.body.removeChild(a)
         window.URL.revokeObjectURL(blobUrl)
       }, 100)
-
-      setDownloadPercent(100)
       setProgress('')
-    } catch (err) {
-      console.error('Error al descargar:', err)
-      // Fallback: abrir en nueva pestaña
-      window.open(downloadUrl, '_blank')
-      setProgress('')
-      setDownloadPercent(0)
-    } finally {
       setLoading(false)
+      setDownloadPercent(0)
+    } catch (err) {
+      console.error('Blob download failed, trying direct:', err)
+      // Fallback: abrir directamente en el navegador
+      window.open(url, '_blank')
+      setProgress('')
+      setLoading(false)
+      setDownloadPercent(0)
     }
+  }
+
+  const handleDownloadFile = () => {
+    if (!downloadUrl) return
+    downloadFromUrl(downloadUrl, downloadFilename || 'video.mp4')
   }
 
   const handleReset = () => {
