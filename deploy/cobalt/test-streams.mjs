@@ -3,13 +3,25 @@ import { test } from 'node:test'
 import { once } from 'node:events'
 import { createServer } from 'node:http'
 import express from 'express'
+import { Agent, getGlobalDispatcher, setGlobalDispatcher } from 'undici'
 import { internalStream } from './src/stream/internal.js'
 import ffmpeg from './src/stream/ffmpeg.js'
 
 // Exercise the actual Cobalt streaming boundary against a controlled origin.
 test('rejected/empty YouTube media is an HTTP error, valid media stays intact', async t => {
+  // The application installs its own Undici dispatcher at startup. Do the same
+  // here: Node 24's bundled dispatcher uses a newer handler API than Undici 6.
+  const previousDispatcher = getGlobalDispatcher()
+  const dispatcher = new Agent()
+  setGlobalDispatcher(dispatcher)
+  t.after(async () => {
+    setGlobalDispatcher(previousDispatcher)
+    await dispatcher.close()
+  })
   const bytes = Buffer.from([0, 0, 0, 12, 102, 116, 121, 112, 105, 115, 111, 109])
+  const requests = []
   const upstream = createServer((req, res) => {
+    requests.push(`${req.method} ${req.url}`)
     const valid = req.url === '/valid'
     res.writeHead(req.url === '/rejected' ? 403 : 200, {
       'Content-Length': valid ? bytes.length : 0,
@@ -58,8 +70,9 @@ test('rejected/empty YouTube media is an HTTP error, valid media stays intact', 
     await response.arrayBuffer()
   }
   const response = await fetch(`${base}/valid`)
-  assert.equal(response.status, 200)
-  assert.deepEqual(Buffer.from(await response.arrayBuffer()), bytes)
+  const body = Buffer.from(await response.arrayBuffer())
+  assert.equal(response.status, 200, JSON.stringify({ body: body.toString(), requests }))
+  assert.deepEqual(body, bytes)
   const refreshed = await fetch(`${base}/refresh`)
   assert.equal(refreshed.status, 200)
   assert.deepEqual(Buffer.from(await refreshed.arrayBuffer()), bytes)
