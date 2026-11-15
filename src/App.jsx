@@ -322,56 +322,26 @@ function App() {
     }
   }
 
-  // Función para descargar usando el proxy de Vercel
-  const downloadFromUrl = async (tunnelUrl, filename) => {
-    try {
-      setProgress('Descargando archivo...')
-      setDownloadPercent(10)
-
-      // Usar el proxy de Vercel para descargar el video
-      const proxyResponse = await fetch('/api/download', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: tunnelUrl, filename }),
-      })
-
-      setDownloadPercent(50)
-
-      if (!proxyResponse.ok) {
-        throw new Error(`Proxy error: ${proxyResponse.status}`)
+  // Función para descargar usando redirección directa
+  // Cobalt envía Content-Disposition: attachment, así que el navegador descargará el archivo
+  const downloadFromUrl = (tunnelUrl, filename) => {
+    // Crear un formulario oculto que redirija al tunnel URL
+    // Esto funciona mejor que window.location.href para cross-origin
+    const form = document.createElement('form')
+    form.method = 'GET'
+    form.action = tunnelUrl
+    form.target = '_blank'
+    form.style.display = 'none'
+    document.body.appendChild(form)
+    form.submit()
+    setTimeout(() => {
+      if (form.parentNode) {
+        form.parentNode.removeChild(form)
       }
-
-      const blob = await proxyResponse.blob()
-      setDownloadPercent(90)
-
-      if (blob.size === 0) {
-        throw new Error('Archivo vacío')
-      }
-
-      const blobUrl = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = blobUrl
-      a.download = filename
-      a.style.display = 'none'
-      document.body.appendChild(a)
-      a.click()
-      setTimeout(() => {
-        document.body.removeChild(a)
-        window.URL.revokeObjectURL(blobUrl)
-      }, 100)
-
-      setDownloadPercent(100)
-      setProgress('')
-      setLoading(false)
-      setTimeout(() => setDownloadPercent(0), 2000)
-    } catch (err) {
-      console.error('Download failed:', err)
-      // Fallback: abrir directamente
-      window.open(tunnelUrl, '_blank')
-      setProgress('')
-      setLoading(false)
-      setDownloadPercent(0)
-    }
+    }, 5000)
+    setProgress('')
+    setLoading(false)
+    setDownloadPercent(0)
   }
 
   const handleDownloadFile = () => {
