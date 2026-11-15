@@ -39,6 +39,10 @@ La calidad seleccionada es un máximo: la calidad final depende de las versiones
 
 Consulta la [API oficial de Cobalt](https://github.com/imputnet/cobalt/blob/main/docs/api.md) y la [guía para alojar una instancia](https://github.com/imputnet/cobalt/blob/main/docs/run-an-instance.md). El sitio público cobalt.tools no sustituye a tu propia API.
 
+La imagen corregida para el servicio de Railway está en [`deploy/cobalt`](deploy/cobalt/README.md).
+Actualiza el cliente de YouTube que producía archivos de cero bytes con algunos
+videos públicos y comprueba los errores de transferencia durante la compilación.
+
 Los archivos `server.py`, `requirements.txt`, `Procfile` y `render-build.sh` pertenecen a una implementación Flask/yt-dlp anterior. **El frontend actual no los usa.** No configures `VITE_API_URL` con ese servidor: los contratos de las dos API son diferentes.
 
 ## Qué se corrigió
