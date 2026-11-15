@@ -5,6 +5,60 @@ import './App.css'
 // Ejemplo: 'https://tu-cobalt.railway.app/'
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
+// Timeout para peticiones (120 segundos para cold starts de Railway)
+const FETCH_TIMEOUT = 120000
+
+// Despertar el servidor de Railway si está en modo sleep
+async function wakeUpServer(baseUrl, maxAttempts = 3) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 15000)
+      
+      const response = await fetch(baseUrl, {
+        method: 'GET',
+        signal: controller.signal,
+        headers: { 'Accept': 'application/json' }
+      })
+      clearTimeout(timeoutId)
+      
+      if (response.ok || response.status === 404) {
+        return true // Servidor está activo
+      }
+    } catch {
+      // Servidor no responde, intentar de nuevo
+      if (attempt < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 2000))
+      }
+    }
+  }
+  return false
+}
+
+// Fetch con timeout y reintentos automáticos
+async function fetchWithRetry(url, options, maxRetries = 2) {
+  for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+    try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT)
+      
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      })
+      clearTimeout(timeoutId)
+      return response
+    } catch (err) {
+      if (attempt <= maxRetries) {
+        // Reintentar con backoff exponencial
+        await new Promise(resolve => setTimeout(resolve, attempt * 3000))
+        continue
+      }
+      throw err
+    }
+  }
+}
+
 // Calidades disponibles para Cobalt
 const QUALITY_OPTIONS = [
   { label: 'Max', value: 'max', description: 'Mejor disponible' },
@@ -119,28 +173,23 @@ function App() {
     }
 
     setLoading(true)
-    setProgress('Buscando video...')
+    setProgress('Despertando servidor...')
 
     try {
+      // Despertar el servidor de Railway si está dormido
+      const isAwake = await wakeUpServer(API_BASE)
+      if (!isAwake) {
+        setError('No se pudo conectar con el servicio de descarga. Intenta de nuevo en unos segundos.')
+        setLoading(false)
+        setProgress('')
+        return
+      }
+
+      setProgress('Buscando video...')
       // Intentar obtener info con oEmbed
       const info = await fetchVideoInfo(url.trim())
       if (info) {
         setVideoInfo(info)
-      }
-
-      setProgress('Verificando enlace...')
-
-      // Verificar que Cobalt esté accesible
-      const checkResponse = await fetch(API_BASE, {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' }
-      })
-
-      if (!checkResponse.ok) {
-        setError('El servicio de descarga no está disponible. Intenta de nuevo en unos segundos.')
-        setLoading(false)
-        setProgress('')
-        return
       }
 
       setStep('formats')
@@ -148,7 +197,7 @@ function App() {
       if (err.name === 'AbortError') {
         setError('Se canceló la búsqueda.')
       } else {
-        setError('No se pudo conectar con el servicio de descarga. Verifica tu conexión.')
+        setError('No se pudo conectar con el servicio de descarga. Verifica tu conexión e intenta de nuevo.')
       }
     } finally {
       setLoading(false)
@@ -160,9 +209,22 @@ function App() {
     setError('')
     setStep('downloading')
     setLoading(true)
-    setProgress('Procesando video...')
+    setProgress('Despertando servidor...')
     setDownloadPercent(0)
     setDownloadUrl('')
+
+    // Despertar el servidor antes de descargar
+    const isAwake = await wakeUpServer(API_BASE)
+    if (!isAwake) {
+      setError('No se pudo conectar con el servicio. El servidor puede estar reiniciándose. Intenta de nuevo en 30 segundos.')
+      setStep('formats')
+      setProgress('')
+      setDownloadPercent(0)
+      setLoading(false)
+      return
+    }
+
+    setProgress('Procesando video...')
 
     // Simular progreso mientras Cobalt procesa
     let progressInterval
@@ -173,10 +235,9 @@ function App() {
       setDownloadPercent(currentPercent)
     }, 500)
 
-    abortControllerRef.current = abortControllerRef.current || new AbortController()
-
     try {
-      const response = await fetch(API_BASE, {
+      // Usar fetch con reintentos automáticos
+      const response = await fetchWithRetry(API_BASE, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -188,7 +249,6 @@ function App() {
           downloadMode: 'auto',
           filenameStyle: 'pretty',
         }),
-        signal: abortControllerRef.current.signal,
       })
 
       clearInterval(progressInterval)
@@ -249,7 +309,7 @@ function App() {
       if (err.name === 'AbortError') {
         setError('Se canceló la descarga.')
       } else {
-        setError('Error de conexión con el servicio de descarga. Verifica que el servicio esté activo.')
+        setError('Error de conexión. El servidor puede estar reiniciándose. Espera 30 segundos e intenta de nuevo.')
       }
       setStep('formats')
       setProgress('')
