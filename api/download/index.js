@@ -1,40 +1,26 @@
-// Vercel Serverless Function para proxy de descarga de videos
+// Vercel Edge Function para proxy de descarga de videos
 // Recibe el tunnel URL de Cobalt y descarga el video para el navegador
 
 export const config = {
   runtime: 'edge',
 };
 
-export default async function handler(req) {
-  // Solo permitir POST
-  if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405 });
-  }
-
+export default async function handler(request) {
   try {
-    const { url, filename } = await req.json();
+    const { url, filename } = await request.json();
 
     if (!url) {
       return new Response('Missing URL', { status: 400 });
     }
 
     // Descargar el video desde Cobalt
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Accept': '*/*',
-      },
-    });
+    const response = await fetch(url);
 
     if (!response.ok) {
       return new Response(`Cobalt error: ${response.status}`, { status: 502 });
     }
 
-    // Obtener el blob
-    const blob = await response.blob();
-    const arrayBuffer = await blob.arrayBuffer();
-
-    // Extraer el nombre del archivo si no se proporcionó
+    // Obtener el nombre del archivo
     const contentDisposition = response.headers.get('content-disposition');
     let finalFilename = filename || 'video.mp4';
     if (contentDisposition && contentDisposition.includes('filename=')) {
@@ -44,12 +30,11 @@ export default async function handler(req) {
       }
     }
 
-    // Devolver el video al navegador
-    return new Response(arrayBuffer, {
+    // Re-stream el video al navegador sin cargar todo en memoria
+    return new Response(response.body, {
       headers: {
         'Content-Type': 'video/mp4',
         'Content-Disposition': `attachment; filename="${finalFilename}"`,
-        'Content-Length': String(arrayBuffer.byteLength),
         'Cache-Control': 'no-cache',
       },
     });
