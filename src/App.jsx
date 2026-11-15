@@ -143,6 +143,7 @@ function App() {
   const [videoInfo, setVideoInfo] = useState(null)
   const [selectedQuality, setSelectedQuality] = useState('1080')
   const [downloadUrl, setDownloadUrl] = useState('')
+  const [downloadFilename, setDownloadFilename] = useState('')
   const [downloadPercent, setDownloadPercent] = useState(0)
   const abortControllerRef = useRef(null)
 
@@ -151,6 +152,7 @@ function App() {
     setError('')
     setVideoInfo(null)
     setDownloadUrl('')
+    setDownloadFilename('')
     setSelectedQuality('1080')
     setStep('input')
 
@@ -212,6 +214,7 @@ function App() {
     setProgress('Despertando servidor...')
     setDownloadPercent(0)
     setDownloadUrl('')
+    setDownloadFilename('')
 
     // Despertar el servidor antes de descargar
     const isAwake = await wakeUpServer(API_BASE)
@@ -270,20 +273,31 @@ function App() {
       setDownloadPercent(100)
 
       if (data.status === 'redirect' && data.url) {
-        // Cobalt devuelve un enlace directo
+        // Cobalt devuelve un enlace directo - descargar inmediatamente
         setDownloadUrl(data.url)
-        setStep('ready')
+        setDownloadFilename(data.filename || 'video.mp4')
         setProgress('')
+        setLoading(false)
+        // Descargar directamente
+        window.location.href = data.url
+        setStep('formats')
       } else if (data.status === 'tunnel' && data.url) {
-        // Cobalt devuelve un enlace de tunnel/streaming
+        // Cobalt devuelve un enlace de tunnel - descargar inmediatamente
         setDownloadUrl(data.url)
-        setStep('ready')
+        setDownloadFilename(data.filename || 'video.mp4')
         setProgress('')
+        setLoading(false)
+        // Descargar directamente redirigiendo al tunnel
+        window.location.href = data.url
+        setStep('formats')
       } else if (data.status === 'stream' && data.url) {
-        // Cobalt devuelve un enlace de streaming
+        // Cobalt devuelve un enlace de streaming - descargar inmediatamente
         setDownloadUrl(data.url)
-        setStep('ready')
+        setDownloadFilename(data.filename || 'video.mp4')
         setProgress('')
+        setLoading(false)
+        window.location.href = data.url
+        setStep('formats')
       } else if (data.status === 'picker' && data.picker) {
         // Múltiples archivos (ej: Instagram carousel)
         setError('Este contenido tiene múltiples archivos. Intenta con un video individual.')
@@ -319,56 +333,11 @@ function App() {
     }
   }
 
-  const handleDownloadFile = async () => {
+  const handleDownloadFile = () => {
     if (!downloadUrl) return
-
-    setLoading(true)
-    setProgress('Descargando archivo...')
-
-    try {
-      // Descargar el archivo como blob para evitar problemas cross-origin
-      const response = await fetch(downloadUrl)
-      if (!response.ok) {
-        throw new Error('No se pudo descargar el archivo')
-      }
-
-      const blob = await response.blob()
-
-      // Obtener el nombre del archivo de la URL o usar un nombre por defecto
-      let filename = 'video.mp4'
-      try {
-        const urlParts = new URL(downloadUrl).pathname.split('/')
-        const lastPart = urlParts[urlParts.length - 1]
-        if (lastPart && lastPart.includes('.')) {
-          filename = decodeURIComponent(lastPart)
-        } else if (videoInfo?.title) {
-          filename = `${videoInfo.title.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ ]/g, '')}.mp4`
-        }
-      } catch {
-        // Usar nombre por defecto
-      }
-
-      // Crear un blob URL y descargar
-      const blobUrl = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = blobUrl
-      a.download = filename
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-
-      // Liberar memoria después de un momento
-      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000)
-
-      setProgress('')
-    } catch (err) {
-      console.error('Error al descargar archivo:', err)
-      // Si falla el blob, intentar con el método tradicional
-      window.open(downloadUrl, '_blank')
-      setProgress('')
-    } finally {
-      setLoading(false)
-    }
+    // Descargar directamente redirigiendo al URL de Cobalt
+    // Cobalt ya envía Content-Disposition: attachment, así que el navegador descargará el archivo
+    window.location.href = downloadUrl
   }
 
   const handleReset = () => {
