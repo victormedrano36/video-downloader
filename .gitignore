@@ -26,3 +26,8 @@ dist-ssr
 # Environment files (keep .env.example, ignore .env)
 .env
 !.env.example
+
+# Local verification and browser test output
+work/
+test-results/
+playwright-report/

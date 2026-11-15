@@ -857,6 +857,33 @@ body {
   color: rgba(255, 255, 255, 0.3);
 }
 
+.quality-note {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin: 16px 0;
+  text-align: center;
+}
+
+a.save-btn {
+  text-decoration: none;
+  text-align: center;
+}
+
+.progress-bar-fill.indeterminate {
+  width: 35%;
+  animation: transfer-progress 1.4s ease-in-out infinite;
+}
+
+@keyframes transfer-progress {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(290%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-bar-fill.indeterminate { animation: none; }
+}
+
 /* ==================== RESPONSIVE ==================== */
 @media (max-width: 480px) {
   .app {

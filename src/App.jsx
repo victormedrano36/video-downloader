@@ -1,68 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useDownloader } from './useDownloader.js'
 import './App.css'
 
-// URL de tu instancia de Cobalt API (desplegada en Railway u otro servidor)
-// Ejemplo: 'https://tu-cobalt.railway.app/'
-const API_BASE = import.meta.env.VITE_API_URL || ''
-
-// Timeout para peticiones (120 segundos para cold starts de Railway)
-const FETCH_TIMEOUT = 120000
-
-// Despertar el servidor de Railway si está en modo sleep
-async function wakeUpServer(baseUrl, maxAttempts = 3) {
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 15000)
-      
-      const response = await fetch(baseUrl, {
-        method: 'GET',
-        signal: controller.signal,
-        headers: { 'Accept': 'application/json' }
-      })
-      clearTimeout(timeoutId)
-      
-      if (response.ok || response.status === 404) {
-        return true // Servidor está activo
-      }
-    } catch {
-      // Servidor no responde, intentar de nuevo
-      if (attempt < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 2000))
-      }
-    }
-  }
-  return false
-}
-
-// Fetch con timeout y reintentos automáticos
-async function fetchWithRetry(url, options, maxRetries = 2) {
-  for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
-    try {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT)
-      
-      const response = await fetch(url, {
-        ...options,
-        signal: controller.signal,
-      })
-      clearTimeout(timeoutId)
-      return response
-    } catch (err) {
-      if (attempt <= maxRetries) {
-        // Reintentar con backoff exponencial
-        await new Promise(resolve => setTimeout(resolve, attempt * 3000))
-        continue
-      }
-      throw err
-    }
-  }
-}
-
-// Calidades disponibles para Cobalt
 const QUALITY_OPTIONS = [
   { label: 'Max', value: 'max', description: 'Mejor disponible' },
-  { label: '4K', value: '2160', description: '2160p Ultra HD' },
+  { label: '4K', value: '2160', description: 'Hasta 2160p' },
   { label: '1080p', value: '1080', description: 'Full HD' },
   { label: '720p', value: '720', description: 'HD' },
   { label: '480p', value: '480', description: 'SD' },
@@ -71,298 +12,16 @@ const QUALITY_OPTIONS = [
 
 function formatDuration(seconds) {
   if (!seconds) return '0:00'
-  const mins = Math.floor(seconds / 60)
-  const secs = Math.floor(seconds % 60)
-  return `${mins}:${secs.toString().padStart(2, '0')}`
-}
-
-// Detectar plataforma desde la URL
-function detectPlatform(videoUrl) {
-  const lower = videoUrl.toLowerCase()
-  if (lower.includes('youtube.com') || lower.includes('youtu.be')) return 'youtube'
-  if (lower.includes('tiktok.com')) return 'tiktok'
-  if (lower.includes('instagram.com')) return 'instagram'
-  if (lower.includes('facebook.com') || lower.includes('fb.com')) return 'facebook'
-  if (lower.includes('x.com') || lower.includes('twitter.com')) return 'twitter'
-  if (lower.includes('vimeo.com')) return 'vimeo'
-  if (lower.includes('reddit.com')) return 'reddit'
-  if (lower.includes('twitch.tv')) return 'twitch'
-  return 'unknown'
-}
-
-// Obtener info del video usando oEmbed (sin backend)
-async function fetchVideoInfo(videoUrl) {
-  const platform = detectPlatform(videoUrl)
-  let oembedUrl = ''
-
-  switch (platform) {
-    case 'youtube':
-      oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(videoUrl)}&format=json`
-      break
-    case 'tiktok':
-      oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(videoUrl)}`
-      break
-    case 'instagram':
-      oembedUrl = `https://api.instagram.com/oembed?url=${encodeURIComponent(videoUrl)}`
-      break
-    case 'facebook':
-      oembedUrl = `https://graph.facebook.com/v18.0/oembed_post?url=${encodeURIComponent(videoUrl)}`
-      break
-    case 'twitter':
-      oembedUrl = `https://publish.twitter.com/oembed?url=${encodeURIComponent(videoUrl)}`
-      break
-    case 'vimeo':
-      oembedUrl = `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(videoUrl)}`
-      break
-    default:
-      return null
-  }
-
-  try {
-    const response = await fetch(oembedUrl)
-    if (!response.ok) return null
-    const data = await response.json()
-    return {
-      title: data.title || data.author_name || 'Video',
-      thumbnail: data.thumbnail_url || '',
-      duration: data.duration ? parseInt(data.duration) : 0,
-      uploader: data.author_name || '',
-      author_url: data.author_url || '',
-    }
-  } catch {
-    return null
-  }
+  return Math.floor(seconds / 60) + ':' + Math.floor(seconds % 60).toString().padStart(2, '0')
 }
 
 function App() {
-  const [url, setUrl] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [progress, setProgress] = useState('')
-  const [step, setStep] = useState('input') // 'input' | 'formats' | 'downloading' | 'ready'
-  const [videoInfo, setVideoInfo] = useState(null)
-  const [selectedQuality, setSelectedQuality] = useState('1080')
-  const [downloadUrl, setDownloadUrl] = useState('')
-  const [downloadFilename, setDownloadFilename] = useState('')
-  const [downloadPercent, setDownloadPercent] = useState(0)
-  const abortControllerRef = useRef(null)
-
-  const handleFetchInfo = async (e) => {
-    e.preventDefault()
-    setError('')
-    setVideoInfo(null)
-    setDownloadUrl('')
-    setDownloadFilename('')
-    setSelectedQuality('1080')
-    setStep('input')
-
-    if (!url.trim()) {
-      setError('Por favor, pega un enlace de video')
-      return
-    }
-
-    try {
-      new URL(url.trim())
-    } catch {
-      setError('Por favor, ingresa un enlace válido')
-      return
-    }
-
-    // Verificar que Cobalt API esté configurada
-    if (!API_BASE.trim()) {
-      setError('Servicio de descarga no configurado. Contacta al administrador.')
-      return
-    }
-
-    setLoading(true)
-    setProgress('Despertando servidor...')
-
-    try {
-      // Despertar el servidor de Railway si está dormido
-      const isAwake = await wakeUpServer(API_BASE)
-      if (!isAwake) {
-        setError('No se pudo conectar con el servicio de descarga. Intenta de nuevo en unos segundos.')
-        setLoading(false)
-        setProgress('')
-        return
-      }
-
-      setProgress('Buscando video...')
-      // Intentar obtener info con oEmbed
-      const info = await fetchVideoInfo(url.trim())
-      if (info) {
-        setVideoInfo(info)
-      }
-
-      setStep('formats')
-    } catch (err) {
-      if (err.name === 'AbortError') {
-        setError('Se canceló la búsqueda.')
-      } else {
-        setError('No se pudo conectar con el servicio de descarga. Verifica tu conexión e intenta de nuevo.')
-      }
-    } finally {
-      setLoading(false)
-      setProgress('')
-    }
-  }
-
-  const handleDownload = async () => {
-    setError('')
-    setStep('downloading')
-    setLoading(true)
-    setProgress('Despertando servidor...')
-    setDownloadPercent(0)
-    setDownloadUrl('')
-    setDownloadFilename('')
-
-    // Despertar el servidor antes de descargar
-    const isAwake = await wakeUpServer(API_BASE)
-    if (!isAwake) {
-      setError('No se pudo conectar con el servicio. El servidor puede estar reiniciándose. Intenta de nuevo en 30 segundos.')
-      setStep('formats')
-      setProgress('')
-      setDownloadPercent(0)
-      setLoading(false)
-      return
-    }
-
-    setProgress('Procesando video...')
-
-    // Simular progreso mientras Cobalt procesa
-    let progressInterval
-    let currentPercent = 0
-    progressInterval = setInterval(() => {
-      currentPercent += Math.random() * 15
-      if (currentPercent > 90) currentPercent = 90
-      setDownloadPercent(currentPercent)
-    }, 500)
-
-    try {
-      // Usar fetch con reintentos automáticos
-      const response = await fetchWithRetry(API_BASE, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          url: url.trim(),
-          videoQuality: selectedQuality,
-          downloadMode: 'auto',
-          filenameStyle: 'pretty',
-        }),
-      })
-
-      clearInterval(progressInterval)
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => '')
-        console.error('Cobalt HTTP error:', response.status, errorText)
-        setError(`El servicio devolvió un error (${response.status}). Intenta con otro video.`)
-        setStep('formats')
-        setProgress('')
-        setDownloadPercent(0)
-        setLoading(false)
-        return
-      }
-
-      const data = await response.json()
-      console.log('Cobalt response:', data)
-
-      setDownloadPercent(100)
-
-      if (data.status === 'redirect' && data.url) {
-        // Cobalt devuelve un enlace directo - descargar inmediatamente
-        setProgress('Iniciando descarga...')
-        downloadFromUrl(data.url, data.filename || 'video.mp4')
-        setStep('formats')
-      } else if (data.status === 'tunnel' && data.url) {
-        // Cobalt devuelve un enlace de tunnel - descargar inmediatamente
-        setProgress('Iniciando descarga...')
-        downloadFromUrl(data.url, data.filename || 'video.mp4')
-        setStep('formats')
-      } else if (data.status === 'stream' && data.url) {
-        // Cobalt devuelve un enlace de streaming - descargar inmediatamente
-        setProgress('Iniciando descarga...')
-        downloadFromUrl(data.url, data.filename || 'video.mp4')
-        setStep('formats')
-      } else if (data.status === 'picker' && data.picker) {
-        // Múltiples archivos (ej: Instagram carousel)
-        setError('Este contenido tiene múltiples archivos. Intenta con un video individual.')
-        setStep('formats')
-        setProgress('')
-        setDownloadPercent(0)
-      } else if (data.status === 'error') {
-        const errorMsg = data.text || data.error || 'No se pudo procesar el video'
-        setError(errorMsg)
-        setStep('formats')
-        setProgress('')
-        setDownloadPercent(0)
-      } else {
-        console.error('Unexpected Cobalt response:', data)
-        setError('Respuesta inesperada del servidor. Intenta de nuevo.')
-        setStep('formats')
-        setProgress('')
-        setDownloadPercent(0)
-      }
-    } catch (err) {
-      clearInterval(progressInterval)
-      console.error('Download error:', err)
-      if (err.name === 'AbortError') {
-        setError('Se canceló la descarga.')
-      } else {
-        setError('Error de conexión. El servidor puede estar reiniciándose. Espera 30 segundos e intenta de nuevo.')
-      }
-      setStep('formats')
-      setProgress('')
-      setDownloadPercent(0)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Función para descargar usando redirección directa
-  // Cobalt envía Content-Disposition: attachment, así que el navegador descargará el archivo
-  const downloadFromUrl = (tunnelUrl, filename) => {
-    // Crear un formulario oculto que redirija al tunnel URL
-    // Esto funciona mejor que window.location.href para cross-origin
-    const form = document.createElement('form')
-    form.method = 'GET'
-    form.action = tunnelUrl
-    form.target = '_blank'
-    form.style.display = 'none'
-    document.body.appendChild(form)
-    form.submit()
-    setTimeout(() => {
-      if (form.parentNode) {
-        form.parentNode.removeChild(form)
-      }
-    }, 5000)
-    setProgress('')
-    setLoading(false)
-    setDownloadPercent(0)
-  }
-
-  const handleDownloadFile = () => {
-    if (!downloadUrl) return
-    downloadFromUrl(downloadUrl, downloadFilename || 'video.mp4')
-  }
-
-  const handleReset = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
-      abortControllerRef.current = null
-    }
-    setUrl('')
-    setError('')
-    setVideoInfo(null)
-    setDownloadUrl('')
-    setStep('input')
-    setLoading(false)
-    setProgress('')
-    setDownloadPercent(0)
-  }
+  const {
+    url, error, loading, progress, step, setStep, videoInfo,
+    selectedQuality, setSelectedQuality, downloadUrl, downloadFilename,
+    downloadPercent, videoChoices, handleFetchInfo, handleDownload,
+    handleReset, handleUrlChange, handleCancel,
+  } = useDownloader()
 
   return (
     <div className="app">
@@ -422,9 +81,12 @@ function App() {
           <div className="input-wrapper">
             <div className="input-icon">🔗</div>
             <input
-              type="url"
+              type="text"
+              inputMode="url"
+              aria-label="Enlace del video"
+              autoComplete="url"
               value={url}
-              onChange={(e) => setUrl(e.target.value)}
+              onChange={handleUrlChange}
               placeholder="Pega el enlace del video aquí..."
               className="url-input"
               required
@@ -446,7 +108,7 @@ function App() {
 
         {/* Error Message */}
         {error && (
-          <div className="error-message">
+          <div className="error-message" role="alert">
             <span className="error-icon">⚠️</span>
             <span>{error}</span>
           </div>
@@ -454,13 +116,16 @@ function App() {
 
         {/* Loading */}
         {loading && (
-          <div className="loading-message">
+          <div className="loading-message" role="status" aria-live="polite">
             <div className="loading-dots">
               <div className="dot"></div>
               <div className="dot"></div>
               <div className="dot"></div>
             </div>
             <p>{progress || 'Procesando...'}</p>
+            <button type="button" className="reset-btn" onClick={handleCancel}>
+              Cancelar
+            </button>
           </div>
         )}
 
@@ -484,7 +149,7 @@ function App() {
                     {videoInfo.uploader}
                   </span>
                 )}
-                {videoInfo.duration && (
+                {Boolean(videoInfo.duration) && (
                   <span className="meta-item">
                     <span className="meta-icon">⏱</span>
                     {formatDuration(videoInfo.duration)}
@@ -515,10 +180,23 @@ function App() {
                 </button>
               ))}
             </div>
-            <button onClick={handleDownload} className="download-now-btn">
+            <p className="quality-note">Se usará la mejor calidad disponible hasta el límite seleccionado.</p>
+            <button onClick={() => handleDownload()} className="download-now-btn">
               <span className="btn-icon">⬇</span>
               Descargar {QUALITY_OPTIONS.find(q => q.value === selectedQuality)?.label || ''}
             </button>
+          </div>
+        )}
+
+        {step === 'picker' && (
+          <div className="quality-section">
+            <h3 className="section-title">Elige el video de la publicación</h3>
+            {videoChoices.map((item, index) => (
+              <button key={item.url} className="save-btn" onClick={() => handleDownload(item)}>
+                Descargar video {index + 1}
+              </button>
+            ))}
+            <button className="reset-btn" onClick={() => setStep('formats')}>Volver a las calidades</button>
           </div>
         )}
 
@@ -526,13 +204,13 @@ function App() {
         {step === 'downloading' && (
           <div className="download-progress-section">
             <div className="progress-header">
-              <span className="progress-label">Procesando video...</span>
-              <span className="progress-percent">{Math.round(downloadPercent)}%</span>
+              <span className="progress-label">Preparando la descarga...</span>
+              <span className="progress-percent">{downloadPercent === null ? 'En curso' : `${Math.round(downloadPercent)}%`}</span>
             </div>
-            <div className="progress-bar-track">
+            <div className="progress-bar-track" role="progressbar" aria-label="Descarga del video" aria-valuemin={0} aria-valuemax={100} aria-valuenow={downloadPercent ?? undefined}>
               <div
-                className="progress-bar-fill"
-                style={{ width: `${downloadPercent}%` }}
+                className={`progress-bar-fill ${downloadPercent === null ? 'indeterminate' : ''}`}
+                style={downloadPercent === null ? undefined : { width: `${downloadPercent}%` }}
               ></div>
             </div>
             <div className="progress-details">
@@ -549,11 +227,11 @@ function App() {
           <div className="success-section">
             <div className="success-icon">✅</div>
             <h3 className="success-title">¡Video listo!</h3>
-            <p className="success-text">Tu video se ha procesado correctamente</p>
-            <button onClick={handleDownloadFile} className="save-btn">
+            <p className="success-text">La descarga se inició. Si tu navegador no guardó el archivo, pulsa el botón.</p>
+            <a href={downloadUrl} download={downloadFilename} className="save-btn">
               <span className="btn-icon">💾</span>
-              Descargar video
-            </button>
+              Guardar video
+            </a>
             <button onClick={handleReset} className="reset-btn">
               Descargar otro video
             </button>
@@ -634,7 +312,7 @@ function App() {
             <div className="faq-item">
               <h3 className="faq-question">¿Cómo descargar Reels de Instagram?</h3>
               <div className="faq-answer">
-                <p>Copia el enlace del Reel de Instagram, pégalo en nuestra herramienta y descarga el video en formato MP4. También puedes descargar fotos, stories y videos normales de Instagram de forma gratuita.</p>
+                <p>Copia el enlace de un Reel o video público de Instagram, pégalo en nuestra herramienta y elige la calidad. Si la publicación contiene varios videos, podrás elegir cuál guardar. El contenido privado o que requiera iniciar sesión puede no estar disponible.</p>
               </div>
             </div>
             <div className="faq-item">
