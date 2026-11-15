@@ -362,8 +362,8 @@ function App() {
           <div className="logo-wrapper">
             <div className="logo-icon">⬇</div>
           </div>
-          <h1 className="title">Social Media Content Download</h1>
-          <p className="subtitle">Descarga videos en la mejor calidad</p>
+          <h1 className="title">Descarga videos de Youtube gratis</h1>
+          <p className="subtitle">Descarga videos en la mejor calidad Youtube a MP4</p>
         </div>
 
         {/* Platform Badges */}
@@ -559,6 +559,7 @@ function App() {
         {/* Footer */}
         <div className="footer">
           <p>Hecho desde República Dominicana 🇩🇴 para descargar tus videos favoritos</p>
+          <p className="footer-credit">Creado por VICMED Dev</p>
         </div>
       </div>
     </div>
