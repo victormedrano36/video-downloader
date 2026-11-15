@@ -319,17 +319,55 @@ function App() {
     }
   }
 
-  const handleDownloadFile = () => {
-    if (downloadUrl) {
-      // Crear un enlace de descarga directa
+  const handleDownloadFile = async () => {
+    if (!downloadUrl) return
+
+    setLoading(true)
+    setProgress('Descargando archivo...')
+
+    try {
+      // Descargar el archivo como blob para evitar problemas cross-origin
+      const response = await fetch(downloadUrl)
+      if (!response.ok) {
+        throw new Error('No se pudo descargar el archivo')
+      }
+
+      const blob = await response.blob()
+
+      // Obtener el nombre del archivo de la URL o usar un nombre por defecto
+      let filename = 'video.mp4'
+      try {
+        const urlParts = new URL(downloadUrl).pathname.split('/')
+        const lastPart = urlParts[urlParts.length - 1]
+        if (lastPart && lastPart.includes('.')) {
+          filename = decodeURIComponent(lastPart)
+        } else if (videoInfo?.title) {
+          filename = `${videoInfo.title.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ ]/g, '')}.mp4`
+        }
+      } catch {
+        // Usar nombre por defecto
+      }
+
+      // Crear un blob URL y descargar
+      const blobUrl = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
-      a.href = downloadUrl
-      a.download = ''
-      a.target = '_blank'
-      a.rel = 'noopener noreferrer'
+      a.href = blobUrl
+      a.download = filename
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
+
+      // Liberar memoria después de un momento
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000)
+
+      setProgress('')
+    } catch (err) {
+      console.error('Error al descargar archivo:', err)
+      // Si falla el blob, intentar con el método tradicional
+      window.open(downloadUrl, '_blank')
+      setProgress('')
+    } finally {
+      setLoading(false)
     }
   }
 
