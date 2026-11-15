@@ -13,8 +13,7 @@ RUN git init . \
 
 COPY cobalt-youtube.patch /tmp/cobalt-youtube.patch
 RUN git apply --check /tmp/cobalt-youtube.patch && git apply /tmp/cobalt-youtube.patch
-RUN --mount=type=cache,id=cobalt-pnpm,target=/pnpm/store \
-    pnpm install --prod --frozen-lockfile --filter @imput/cobalt-api...
+RUN pnpm install --prod --frozen-lockfile --filter @imput/cobalt-api...
 
 COPY test-streams.mjs /app/api/test-streams.mjs
 RUN API_URL=http://127.0.0.1:9000 node --test api/test-streams.mjs
