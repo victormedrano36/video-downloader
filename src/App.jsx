@@ -363,8 +363,8 @@ function App() {
             <div className="logo-icon">⬇</div>
           </div>
           <h1 className="title">Descarga videos de Youtube gratis</h1>
-          <p className="subtitle">Descarga videos en la mejor calidad Youtube a MP4</p>
           <p className="brand-name">VicDownloader</p>
+          <p className="subtitle">Descarga videos en la mejor calidad Youtube a MP4</p>
         </div>
 
         {/* Platform Badges */}
