@@ -322,13 +322,32 @@ function App() {
     }
   }
 
-  // Función para descargar desde una URL usando blob
-  const downloadFromUrl = async (url, filename) => {
+  // Función para descargar usando el proxy de Vercel
+  const downloadFromUrl = async (tunnelUrl, filename) => {
     try {
-      const response = await fetch(url, { mode: 'cors' })
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
-      const blob = await response.blob()
-      if (blob.size === 0) throw new Error('Archivo vacío')
+      setProgress('Descargando archivo...')
+      setDownloadPercent(10)
+
+      // Usar el proxy de Vercel para descargar el video
+      const proxyResponse = await fetch('/api/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: tunnelUrl, filename }),
+      })
+
+      setDownloadPercent(50)
+
+      if (!proxyResponse.ok) {
+        throw new Error(`Proxy error: ${proxyResponse.status}`)
+      }
+
+      const blob = await proxyResponse.blob()
+      setDownloadPercent(90)
+
+      if (blob.size === 0) {
+        throw new Error('Archivo vacío')
+      }
+
       const blobUrl = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = blobUrl
@@ -340,13 +359,15 @@ function App() {
         document.body.removeChild(a)
         window.URL.revokeObjectURL(blobUrl)
       }, 100)
+
+      setDownloadPercent(100)
       setProgress('')
       setLoading(false)
-      setDownloadPercent(0)
+      setTimeout(() => setDownloadPercent(0), 2000)
     } catch (err) {
-      console.error('Blob download failed, trying direct:', err)
-      // Fallback: abrir directamente en el navegador
-      window.open(url, '_blank')
+      console.error('Download failed:', err)
+      // Fallback: abrir directamente
+      window.open(tunnelUrl, '_blank')
       setProgress('')
       setLoading(false)
       setDownloadPercent(0)
