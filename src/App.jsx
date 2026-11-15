@@ -273,31 +273,26 @@ function App() {
       setDownloadPercent(100)
 
       if (data.status === 'redirect' && data.url) {
-        // Cobalt devuelve un enlace directo - descargar inmediatamente
+        // Cobalt devuelve un enlace directo
         setDownloadUrl(data.url)
         setDownloadFilename(data.filename || 'video.mp4')
+        setStep('ready')
         setProgress('')
         setLoading(false)
-        // Descargar directamente
-        window.location.href = data.url
-        setStep('formats')
       } else if (data.status === 'tunnel' && data.url) {
-        // Cobalt devuelve un enlace de tunnel - descargar inmediatamente
+        // Cobalt devuelve un enlace de tunnel - descargar con fetch + blob
         setDownloadUrl(data.url)
         setDownloadFilename(data.filename || 'video.mp4')
+        setStep('ready')
         setProgress('')
         setLoading(false)
-        // Descargar directamente redirigiendo al tunnel
-        window.location.href = data.url
-        setStep('formats')
       } else if (data.status === 'stream' && data.url) {
-        // Cobalt devuelve un enlace de streaming - descargar inmediatamente
+        // Cobalt devuelve un enlace de streaming
         setDownloadUrl(data.url)
         setDownloadFilename(data.filename || 'video.mp4')
+        setStep('ready')
         setProgress('')
         setLoading(false)
-        window.location.href = data.url
-        setStep('formats')
       } else if (data.status === 'picker' && data.picker) {
         // Múltiples archivos (ej: Instagram carousel)
         setError('Este contenido tiene múltiples archivos. Intenta con un video individual.')
@@ -333,13 +328,56 @@ function App() {
     }
   }
 
-  const handleDownloadFile = () => {
+  const handleDownloadFile = async () => {
     if (!downloadUrl) return
-    // Abrir en nueva pestaña para que el navegador descargue con Content-Disposition de Cobalt
-    const newWindow = window.open(downloadUrl, '_blank')
-    if (!newWindow) {
-      // Si el popup blocker lo bloquea, usar redirección
-      window.location.href = downloadUrl
+
+    setLoading(true)
+    setProgress('Descargando archivo...')
+    setDownloadPercent(0)
+
+    try {
+      // Descargar el video como blob desde el tunnel de Cobalt
+      const response = await fetch(downloadUrl, {
+        method: 'GET',
+        mode: 'cors',
+      })
+
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: No se pudo descargar`)
+      }
+
+      // Leer el contenido como blob
+      const blob = await response.blob()
+
+      if (blob.size === 0) {
+        throw new Error('El archivo descargado está vacío')
+      }
+
+      // Crear URL del blob y descargar
+      const blobUrl = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = blobUrl
+      a.download = downloadFilename || 'video.mp4'
+      a.style.display = 'none'
+      document.body.appendChild(a)
+      a.click()
+
+      // Limpiar
+      setTimeout(() => {
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(blobUrl)
+      }, 100)
+
+      setDownloadPercent(100)
+      setProgress('')
+    } catch (err) {
+      console.error('Error al descargar:', err)
+      // Fallback: abrir en nueva pestaña
+      window.open(downloadUrl, '_blank')
+      setProgress('')
+      setDownloadPercent(0)
+    } finally {
+      setLoading(false)
     }
   }
 
