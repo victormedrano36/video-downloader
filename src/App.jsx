@@ -1,3 +1,4 @@
+import { Analytics } from '@vercel/analytics/react'
 import { useDownloader } from './useDownloader.js'
 import './App.css'
 
@@ -24,7 +25,9 @@ function App() {
   } = useDownloader()
 
   return (
-    <div className="app">
+    <>
+      <Analytics />
+      <div className="app">
       <div className="bg-animation">
         <div className="bg-circle circle-1"></div>
         <div className="bg-circle circle-2"></div>
@@ -361,6 +364,7 @@ function App() {
         </div>
       </div>
     </div>
+    </>
   )
 }
 
